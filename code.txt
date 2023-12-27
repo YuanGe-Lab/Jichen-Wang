@@ -1,0 +1,701 @@
+1.#Figure 1a
+ library(ggplot2)
+library(ggmap)
+library(sp)
+library(maptools)
+library(maps)
+setwd("D:/Desktop/")
+load("D:/Desktop/wdmap.RData")
+xb<-read.csv('figure1.csv')
+ ggplot(xb) + mapworld + ylim(-90,90) + #xlim(-170,200) +
+ geom_point(aes(x=Longitude,y=Latitude,color=source,size=3), shape=16, alpha=0.6)+
+ #geom_point(aes(x=m.lon,y=m.lat,color=source), shape=1, alpha=0.8)+
+ #+scale_color_manual(values = c("#E33539","#C18C00","#780062","#426EB4","#5BBD2B"))+
+ #scale_size(range = c(0.1,3))+
+ #scale_size(range = c(1,10)/2)+
+ #scale_color_manual(values = color)+
+ theme_bw() + xlab("Longitude")+ylab("Latitude")+
+ theme(text=element_text(size = 8, family = "sans", face = "plain"), 
+ #panel.grid.major.y = element_blank(), 
+ #panel.grid.minor.y =element_blank(), 
+ #panel.grid.major.x =element_blank(), 
+ #panel.grid.minor.x =element_blank(), 
+ panel.background = element_rect(color = 'black', fill = 'transparent'),legend.position = "top") 
+
+ 2.#Figure 1b&1c
+library(ggplot2)
+library(ggpubr)
+library(ggforce)
+ setwd("D:/Desktop/")
+ 
+xa<-read.csv('figure1.csv')
+ ggplot(xa,aes(source,shannon),size=2)+geom_violin(aes(color=source)) + geom_boxplot(aes(color=source),width = 0.05)+ theme( text=element_text(size = 16,color="black"))
+  ggplot(xa,aes(source,coverage),size=2)+geom_violin(aes(color=source)) + geom_boxplot(aes(color=source),width = 0.05)+ theme( text=element_text(size = 16,color="black"))
+
+ 
+ 3##Figure 1d
+library('vegan')
+ library(ggplot2)
+ library(ggpubr)
+
+ xx<-read.csv('species_total.csv',header=T,row.names = 1)
+ x1<-xx[,1]
+ x2<-xx[,-1] 
+ sp<-metaMDS(x2,distance='bray',k=2)
+ sample_site=sp[["points"]]
+ sample_site=as.data.frame(cbind(sample_site,x1))
+
+ p=ggplot(sample_site, aes(as.numeric(MDS1),as.numeric( MDS2)))+theme(panel.background = element_blank(),panel.border=element_rect(fill=NA))
+ p+geom_point(aes(color=x1),alpha = 0.8,size=2)+scale_color_manual(values = c("#3154aa", "#ac5e74"))
+ 
+ 
+ 4.#Figure2
+  # 2b&2d
+  setwd("D:/Desktop/")
+ library(UpSetR)
+ xa <- read.csv('soil_dependent_gene.csv',header=T)
+  upset(xa[,1:13], nset=8,nintersects =20, order.by = c('freq'),mb.ratio = c(0.5, 0.5),text.scale = 2,point.size = 3.5,sets.x.label = "Number of MAGs",mainbar.y.label = "Number of MAGs")
+ 
+ xb <- read.csv('marine_dependent_gene.csv',header=T)
+ upset(xb[,1:13], nset=8 ,nintersects =20,order.by = c('freq'),mb.ratio = c(0.5, 0.5),text.scale = 2,point.size = 3.5,sets.x.label = "Number of MAGs",mainbar.y.label = "Number of MAGs")
+  
+ ### 2a&2c
+ library(webr)
+ require(moonBook)
+ require(ggplot2)
+ PieDonut(xa,aes(Users,Producers),title="soil")
+ PieDonut(xb,aes(Users,Producers),title="marine")
+ 
+ 
+ 5.#Figure3b
+ library(pheatmap)
+setwd("D:/Desktop/")
+xa<-read.csv('phylum _heatmap.csv',header=T,row.names = 1)
+xa[is.na(xa)]=0
+xa$marine <- log10(xa$marine +1)
+xa$soil <- log10(xa$soil +1)
+
+pheatmap(xa,scale="none",cluster_cols = F,border=F,display_numbers=F,number_format="%.0f",fontsize = 10,colorRampPalette(rev(c("#9E0142", "#D53E4F", "#F46D43" ,"#FDAE61" ,"#FEE08B","white" ,"#E6F598", "#ABDDA4" ,"#66C2A5", "#3288BD","#5E4FA2")))(255))
+
+ 
+ 6.#Figure S2,S3,S4,S5
+ ###soil
+  setwd("D:/Desktop/")
+ 
+ xb<-read.csv('soil_top_30cm_layer.csv',row.names=1)
+ 
+library(MASS)
+library(randomForest)
+ library(caret)
+
+ cols_remain2<- c("log2sum_RPKM", "ABS_latit","CN30cm_1","SMC30cm_1","SMN30cm_1","haiba","annual_average_prec","labP","orgP","totP","cec_0.30_mean","nitrogen_0.30_mean","phh2o_0.30_mean","soc_0.30_mean","annual_solar_radiation","annual_average_temp") 
+ 
+  xbNA <- xb[ ,colnames(xb) %in% cols_remain2]
+  xbNA<- na.omit(xbNA)  
+ 
+  set.seed(1)  
+ train2 <- sample(1959,1959*0.7) 
+
+ X <- xbNA[,names(xbNA) != "log2sum_RPKM"]
+y <- xbNA$log2sum_RPKM
+
+  set.seed(42) 
+ train2 <- createDataPartition(y, p = 0.7, list = FALSE) 
+ 
+ X_train <- X[train2,]
+y_train <- y[train2]
+X_test <- X[-train2,]
+y_test <- y[-train2]
+
+rfFuncs <- getModelInfo("rf", regex = FALSE)[[1]]
+
+  grid <- expand.grid(mtry = seq(1, 15, by = 1))
+
+ results <- list()
+ for (ntree in c(300,500, 700, 1000, 1300,1600,1900,2200,2500,3000)) {
+     
+     # Modify the fit function to use the current ntree value
+     rfFuncs$fit <- function(x, y, lev = NULL, last = TRUE, weights = NULL, ...) {
+         randomForest::randomForest(x, y, ntree = ntree, ...)
+     }
+     # Perform grid search
+     rf_grid_search <- train(X_train, y_train, method = rfFuncs, tuneGrid = grid, trControl = trainControl(method = "cv", number = 10, repeats = 8, verboseIter = TRUE))
+      # Store the results
+      results[[paste0("ntree_", ntree)]] <- rf_grid_search }
+ 
+  library(ggplot2)
+df <- data.frame(ntree = numeric(), mtry = numeric(), RMSE = numeric())
+for (name in names(results)) {
+  ntree <- as.numeric(gsub("ntree_", "", name))
+  res <- results[[name]]$results 
+  df <- rbind(df, data.frame(ntree = ntree, mtry = res$mtry, RMSE = res$RMSE))
+}
+ggplot(df, aes(x = mtry, y = RMSE, color = factor(ntree))) +  geom_line()+  labs(x = "mtry", y = "RMSE", color = "ntree") +  theme_minimal() #+geom_point()
+ print(results$ntree_1000) 
+ 
+ rfFuncs <- getModelInfo("rf", regex = FALSE)[[1]]
+
+ rfFuncs$fit <- function(x, y, first, last, ...) {randomForest(x, y, mtry=11, ntree=1000, ...) }
+ 
+ ctrl <- rfeControl(functions = rfFuncs,  
+                    method = "cv",        
+                    number = 10,          
+                    repeats = 10)         
+ results <- rfe(xbNA[,-2],    
+                xbNA$log2sum_RPKM,  
+                sizes = c(1:15),  
+                rfeControl = ctrl)  
+				
+ print(results)
+ plot(results$results$RMSE) 
+  results$optVariables 
+ results$optsize 
+ 
+#  [1] "annual_solar_radiation" "ABS_latit"              "phh2o_0.30_mean"       
+#  [4] "cec_0.30_mean"          "haiba"                  "annual_average_prec"   
+#  [7] "nitrogen_0.30_mean"     "SMN30cm_1"              "SMC30cm_1"             
+# [10] "annual_average_temp"    "soc_0.30_mean"          "CN30cm_1"              
+# [13] "orgP"                   "labP"                   "totP"          
+
+ set.seed(123)
+ forest.soil <- randomForest(log2sum_RPKM ~ ABS_latit + CN30cm_1 +SMC30cm_1 + SMN30cm_1 + haiba + annual_average_prec + labP + orgP +totP + cec_0.30_mean + nitrogen_0.30_mean + phh2o_0.30_mean +soc_0.30_mean + annual_solar_radiation + annual_average_temp,data=xbNA,mtry=11,ntree=1000,importance=TRUE) 
+ 
+ forest.pred <- predict(forest.soil,newdata=xbNA[-train2,])
+ mean((forest.pred-y_test)^2)
+varImpPlot(forest.soil)
+importance(forest.soil) 
+ plot(importance(forest.soil))
+ 
+ #figure S12
+ library(pdp)
+features <- setdiff(names(), "log2sum_RPKM")
+par(mfrow=c(ceiling(length(features) / 3), 3))
+for (feature in features) {
+   pdp_single <- partial(forest.marine, pred.var = feature, plot = F) 
+   plot(pdp_single, type="l")
+}
+ 
+
+ ###marine 
+ xc<-read.csv('marine_top_100m_layer.csv',row.names=1)
+ cols_remain3<- c("ABS_latit","log2sum_RPKM","salinity","phosphate","density","nitrate","oxygen_sensor","temperature","O2sat","conductivity","AOU","silicate","Present.Surface.Calcite.Mean.BOv2_2","Present.Surface.Chlorophyll.Mean","Present.Surface.Iron.Mean","Present.Surface.Par.Mean.BOv2_2","Present.Surface.pH.BOv2_2","Present.Surface.Phytoplankton.Mean","Present.Surface.Primary.productivity.Mean") 
+ 
+ 
+ xcNA <- xc[ ,colnames(xc) %in% cols_remain3]
+  xcNA<- na.omit(xcNA)  
+ X <- xcNA[,names(xcNA) != "log2sum_RPKM"]
+y <- xcNA$log2sum_RPKM
+
+  set.seed(42) 
+ train3 <- createDataPartition(y, p = 0.7, list = FALSE) 
+ 
+ X_train <- X[train3,]
+y_train <- y[train3]
+X_test <- X[-train3,]
+y_test <- y[-train3]
+
+rfFuncs <- getModelInfo("rf", regex = FALSE)[[1]]
+ grid <- expand.grid(mtry = seq(1, 18, by = 1))
+  
+ results <- list()
+ for (ntree in c(100, 300, 500, 700, 1000, 1300,1600,1900,2200,2500)) {
+        rfFuncs$fit <- function(x, y, lev = NULL, last = TRUE, weights = NULL, ...) {
+         randomForest::randomForest(x, y, ntree = ntree, ...)
+     }
+     rf_grid_search <- train(X_train, y_train, method = rfFuncs, tuneGrid = grid, trControl = trainControl(method = "cv", number = 10, repeats = 8, verboseIter = TRUE))
+      results[[paste0("ntree_", ntree)]] <- rf_grid_search }
+ 
+df <- data.frame(ntree = numeric(), mtry = numeric(), RMSE = numeric())
+for (name in names(results)) {
+  ntree <- as.numeric(gsub("ntree_", "", name))
+  res <- results[[name]]$results  
+  df <- rbind(df, data.frame(ntree = ntree, mtry = res$mtry, RMSE = res$RMSE))
+}
+ggplot(df, aes(x = mtry, y = RMSE, color = factor(ntree))) +  geom_line() +geom_point()+  labs(x = "mtry", y = "RMSE", color = "ntree") +  theme_minimal()
+ 
+ print(result$ntree_1300) 
+#   mtry  RMSE      Rsquared
+#    4    1.866847  0.3667962
+#    12   1.866954  0.3667423
+ 
+ rfFuncs$fit <- function(x, y, first, last, ...) {
+     randomForest(x, y, mtry=4, ntree=1300, ...)
+ }
+
+ ctrl <- rfeControl(functions = rfFuncs, 
+                    method = "cv",       
+                    number = 10,         
+                    repeats = 10)        
+
+ results <- rfe(xcNA[, -2],    
+                xcNA$log2sum_RPKM, 
+                sizes = c(1:18),  
+                rfeControl = ctrl)  
+				
+ print(results)
+ggplot(results$results, aes(x = Variables, y = RMSE)) +  geom_line()+geom_point() +theme_minimal()+ scale_x_continuous(breaks=seq(0,18,1))+scale_y_continuous(breaks=seq(1.7,2.2,0.05)) 
+
+  results$optVariables 
+ results$optsize 
+ #Variables  RMSE Rsquared   MAE  RMSESD RsquaredSD   MAESD Selected
+ # 6 1.776   0.4278 1.189 0.12687    0.05880 0.05408        *
+   
+# [1] "ABS_latit"                           "oxygen_sensor"                      
+# [3] "AOU"                                 "Present.Surface.Phytoplankton.Mean" 
+# [5] "Present.Surface.Calcite.Mean.BOv2_2" "Present.Surface.Chlorophyll.Mean"
+rfFuncs$fit <- function(x, y, first, last, ...) {
+     randomForest(x, y, mtry=12, ntree=1300, ...)
+ }
+
+ ctrl <- rfeControl(functions = rfFuncs, 
+                    method = "cv",       
+                    number = 10,         
+                    repeats = 10)        
+
+ results <- rfe(xcNA[, -2],    
+                xcNA$log2sum_RPKM, 
+                sizes = c(1:18),  
+                rfeControl = ctrl)  
+				
+ print(results)
+ggplot(results$results, aes(x = Variables, y = RMSE)) +  geom_line()+geom_point() +theme_minimal()+ scale_x_continuous(breaks=seq(0,18,1))+scale_y_continuous(breaks=seq(1.7,2.2,0.05)) 
+
+  results$optVariables 
+ results$optsize 
+#Variables  RMSE Rsquared   MAE RMSESD RsquaredSD   MAESD Selected
+#13         1.747   0.4467 1.159 0.1343    0.04608 0.08087        *
+
+#  [1] "ABS_latit"                           "AOU"                                
+#  [3] "oxygen_sensor"                       "Present.Surface.Calcite.Mean.BOv2_2"
+#  [5] "temperature"                         "silicate"                           
+#  [7] "Present.Surface.Phytoplankton.Mean"  "salinity"                           
+#  [9] "Present.Surface.Chlorophyll.Mean"    "O2sat"                              
+# [11] "Present.Surface.Par.Mean.BOv2_2"     "Present.Surface.pH.BOv2_2"          
+# [13] "Present.Surface.Iron.Mean"          
+
+ 
+ set.seed(123)
+ forest.marine <- randomForest(log2sum_RPKM~ ABS_latit+AOU+oxygen_sensor+Present.Surface.Calcite.Mean.BOv2_2+temperature+silicate+ Present.Surface.Phytoplankton.Mean+salinity+Present.Surface.Chlorophyll.Mean+O2sat+    Present.Surface.Par.Mean.BOv2_2+Present.Surface.pH.BOv2_2+Present.Surface.Iron.Mean ,data=xcNA,mtry=12,ntree=1300,importance=TRUE) 
+     y.test2 <- xcNA[-train3,"log2sum_RPKM"]
+
+ forest.pred <- predict(forest.marine,newdata=xcNA[-train3,])
+varImpPlot(forest.marine)
+importance(forest.marine) 
+ 
+ #figure S11
+library(pdp)
+features <- setdiff(names(), "log2sum_RPKM")
+par(mfrow=c(ceiling(length(features) / 3), 3))
+for (feature in features) {
+   pdp_single <- partial(forest.marine, pred.var = feature, plot = F) 
+   plot(pdp_single, type="l")
+}
+ 
+
+ 7.# Figure 4a&4b ；Figure S5
+  library(automap)
+ library(ggplot2)
+ library(maps)
+ library(pacman)
+ library(gstat)
+ library(rgdal)
+ p_load(sf,raster,tidyverse)
+ 7.1#Figure 4b &S5b #soil
+  xa <- read.csv("soil_top_30cm_layer.csv",row.names=1, header = TRUE, stringsAsFactors = FALSE)
+  cols_remain2<- c( "Longitude","Latitude","log2sum_RPKM", "ABS_latit","CN30cm_1","SMC30cm_1","SMN30cm_1","haiba","annual_average_prec","labP","orgP","totP","cec_0.30_mean","nitrogen_0.30_mean","phh2o_0.30_mean","soc_0.30_mean","annual_solar_radiation","annual_average_temp")  
+ 
+  xaa <- xa[ ,colnames(xa) %in% cols_remain2] 
+  xaa<- na.omit(xaa)   
+ 
+ lon <- seq(-180,180,0.2)
+ lat <- seq(-90,90,0.2)
+ coordinate <- matrix(nrow = length(lon) * length(lat),ncol = 2)
+ 
+ z <- 1
+ for (i in 1:length(lat)) {
+for (j in 1:length(lon)) {
+coordinate[z,1] <- lon[j]
+coordinate[z,2] <- lat[i]
+z <- z + 1
+}
+ }
+ z
+ coordinate <- as.data.frame(coordinate)
+ colnames(coordinate) <- c("longitude", "latitude")
+ coordinate$ABS_latit <- abs(coordinate$latitude)
+ 
+   SMN30cm_1 <- raster::extract(raster('./bio_CN_biom/SMN30cm_1.tif'), coordinate[,1:2]) 
+   haiba <- raster::extract(raster('./wc2.1_2.5m_elev/wc2.1_2.5m_elev.tif'), coordinate[,1:2]) 
+   totP <- raster::extract(raster('./soil_P/totP_1.tif'), coordinate[,1:2]) 
+   cec_0.5 <- raster('./soil_profile/cec_0-5cm_mean_1000.tif')
+   cec_5.15 <- raster('./soil_profile/cec_5-15cm_mean_1000.tif')
+   cec_15.30 <- raster('./soil_profile/cec_15-30cm_mean_1000.tif')
+   nitrogen_0.5 <- raster('./soil_profile/nitrogen_0-5cm_mean_1000.tif')
+   nitrogen_5.15 <- raster('./soil_profile/nitrogen_5-15cm_mean_1000.tif')
+   nitrogen_15.30<- raster('./soil_profile/nitrogen_15-30cm_mean_1000.tif')    
+  phh2o_0.5  <- raster('./soil_profile/phh2o_0-5cm_mean_1000.tif')
+   phh2o_5.15  <- raster('./soil_profile/phh2o_5-15cm_mean_1000.tif')
+   phh2o_15.30 <- raster('./soil_profile/phh2o_15-30cm_mean_1000.tif')
+   cec_0.5  =projectRaster( cec_0.5  ,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")
+  cec_5.15  =projectRaster(cec_5.15 ,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")
+  cec_15.30 =projectRaster(cec_15.30,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")
+  nitrogen_0.5  =projectRaster( nitrogen_0.5  ,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")
+  nitrogen_5.15  =projectRaster(nitrogen_5.15 ,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")
+  nitrogen_15.30 =projectRaster(nitrogen_15.30,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")
+  phh2o_0.5  =projectRaster( phh2o_0.5  ,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")
+  phh2o_5.15  =projectRaster(phh2o_5.15 ,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")
+  phh2o_15.30 =projectRaster(phh2o_15.30,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")
+  writeRaster(cec_0.5  ,"./soil_profile_regress_select/cec_0.5.tif")
+  writeRaster(cec_5.15 ,"./soil_profile_regress_select/cec_5.15.tif")
+  writeRaster(cec_15.30,"./soil_profile_regress_select/cec_15.30.tif")
+  writeRaster(nitrogen_0.5  ,"./soil_profile_regress_select/nitrogen_0.5.tif")
+  writeRaster(nitrogen_5.15 ,"./soil_profile_regress_select/nitrogen_5.15.tif")
+  writeRaster(nitrogen_15.30,"./soil_profile_regress_select/nitrogen_15.30.tif")
+   writeRaster(phh2o_0.5  ,"./soil_profile_regress_select/phh2o_0.5.tif")
+  writeRaster(phh2o_5.15 ,"./soil_profile_regress_select/phh2o_5.15.tif")
+  writeRaster(phh2o_15.30,"./soil_profile_regress_select/phh2o_15.30.tif")
+ 
+ soc_0.5  <- raster('./soil_profile/soc_0-5cm_mean_1000.tif')                                   
+ soc_5.15  <- raster('./soil_profile/soc_0-5cm_mean_1000.tif')                                  
+ soc_15.30 <- raster('./soil_profile/soc_0-5cm_mean_1000.tif')                                  
+ soc_0.5  =projectRaster( soc_0.5  ,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")  
+ soc_5.15  =projectRaster(soc_5.15 ,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")  
+ soc_15.30 =projectRaster(soc_15.30,crs = "+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs ")  
+  writeRaster(soc_0.5  ,"./soil_profile_regress_select/soc_0.5.tif")                            
+ writeRaster(soc_5.15 ,"./soil_profile_regress_select/soc_5.15.tif")                            
+ writeRaster(soc_15.30,"./soil_profile_regress_select/soc_15.30.tif")                           
+ 
+   dir("soil_profile_regress_select",full.names = T) %>% stack() ->  cec_nitrogen_ph_soc  
+  cec_nitrogen_ph_soc <- raster::extract(cec_nitrogen_ph_soc, coordinate[,1:2])           
+   cec_0.30_mean <- rowMeans(cec_nitrogen_ph_soc[,1:3])                                   
+   nitrogen_0.30_mean <- rowMeans(cec_nitrogen_ph_soc[,4:6] )                             
+   phh2o_0.30_mean <- rowMeans(cec_nitrogen_ph_soc[,7:9] )                                
+  soc_0.30_mean <- rowMeans(cec_nitrogen_ph_soc[,10:12])  
+ labP <- raster::extract(raster('./soil_P/labP_1.tif'), coordinate[,1:2])                            
+   orgP <- raster::extract(raster('./soil_P/orgP_1.tif'), coordinate[,1:2])                          
+  CN30cm_1<- raster::extract(raster('./bio_CN_biom/CN30cm_1.tif'), coordinate[,1:2])                 
+  SMC30cm_1<- raster::extract(raster('./bio_CN_biom/SMC30cm_1.tif'), coordinate[,1:2])               
+  dir("wc2.1_2.5m_srad",full.names = T) %>% stack() -> annual_srad
+  annual_solar_radiation <- rowMeans(raster::extract(annual_srad, coordinate[,1:2]) )
+    dir("wc2.1_2.5m_tavg",full.names = T) %>% stack() -> annual_temp
+  annual_average_temp <- rowMeans(raster::extract(annual_temp, coordinate[,1:2]) )
+    dir("wc2.1_2.5m_prec",full.names = T) %>% stack() -> annual_prec  
+  annual_average_prec <- rowMeans(raster::extract(annual_prec, coordinate[,1:2]) )  
+   
+ coordinate2<- cbind(coordinate,SMN30cm_1,haiba, cec_0.30_mean,nitrogen_0.30_mean,phh2o_0.30_mean,annual_solar_radiation,annual_average_temp,labP,orgP,totP,CN30cm_1,SMC30cm_1,annual_average_prec,soc_0.30_mean) 
+  coordinate2<-na.omit(coordinate2)
+ #write.csv(coordinate2,"coordinate22.csv")
+
+coordinates(xaa) =~ Longitude+Latitude
+
+ forest.soil <- randomForest(log2sum_RPKM ~ ABS_latit + CN30cm_1 +SMC30cm_1 + SMN30cm_1 + haiba + annual_average_prec + labP + orgP +totP+ cec_0.30_mean + nitrogen_0.30_mean + phh2o_0.30_mean +soc_0.30_mean + annual_solar_radiation + annual_average_temp,data=xaa,mtry=11,ntree=1000,importance=TRUE)  
+  prediction <- predict(forest.soil, newdata = coordinate2, predict.all=TRUE) 
+   variance <- apply(prediction$individual, 1, var)  
+     final_prediction <- prediction$aggregate
+
+   final_prediction <-as.data.frame(final_prediction)
+   variance <-as.data.frame(variance)
+   
+ prediction3<- cbind(coordinate2[,1:2],final_prediction,variance)
+  head(prediction3)
+  
+  pdf('soil.pdf')
+ map_data <- readOGR(dsn = "ne_10m_admin_0_countries", layer = "ne_10m_admin_0_countries")
+ ggplot()+geom_tile(data=prediction3,aes(x = longitude,y = latitude, fill = final_prediction))+geom_polygon(data = map_data, aes(x = long, y = lat, group=group),fill=NA,color="gray50")+coord_equal()+scale_fill_gradientn(colours=rev(c("#9E0142", "#D53E4F", "#F46D43" ,"#FDAE61" ,"#FEE08B","#FFFFBF" ,"#E6F598", "#ABDDA4" ,"#66C2A5", "#3288BD","#5E4FA2")),values=scales::rescale(c(0,0.5,0.65,0.75,0.85,1)))+theme_minimal()+theme(axis.title= element_blank()) 
+dev.off()
+
+ pdf('soil_variance2.pdf')
+ ggplot()+geom_tile(data=prediction3,aes(x = longitude,y = latitude, fill = variance))+geom_polygon(data = map_data, aes(x = long, y = lat, group=group),fill=NA,color="gray50")+coord_equal()+scale_fill_gradientn(colours=rev(c("#9E0142", "#D53E4F", "#F46D43" ,"#FDAE61" ,"#FEE08B","#FFFFBF" ,"#E6F598", "#ABDDA4" ,"#66C2A5", "#3288BD","#5E4FA2")),values=scales::rescale(c(0,0.5,0.65,0.75,0.85,1)))+theme_minimal()+theme(axis.title= element_blank()) 
+dev.off()
+ df2 <- prediction3 %>%group_by(latitude) %>%summarise(var1.pred.mean = mean(final_prediction),var1.pred.sd =  sd(final_prediction))
+ pdf('soil_regression_RF_additional.pdf')
+ ggplot(df2 , aes(var1.pred.mean , latitude))+geom_ribbon(aes(xmin = var1.pred.mean- var1.pred.sd,xmax = var1.pred.mean+var1.pred.sd ), alpha = 0.2)+geom_line( orientation = "y",size =1)+theme_minimal()+scale_y_continuous(limits = c(-90, 90))
+dev.off()
+
+ 7.2##marine #Figure 4a&S5a
+   
+ lon <- seq(-180,180,0.2)
+ lat <- seq(-90,90,0.2)
+ coordinate <- matrix(nrow = length(lon) * length(lat),ncol = 2)
+  z <- 1
+ for (i in 1:length(lat)) {
+for (j in 1:length(lon)) {
+coordinate[z,1] <- lon[j]
+coordinate[z,2] <- lat[i]
+z <- z + 1
+} }
+z
+  coordinate <- as.data.frame(coordinate)
+colnames(coordinate) <- c("longitude", "latitude")
+
+dir("salinity_select_regression",full.names = T) %>% stack() -> salinity_select_regression 
+  mm<-list.files('salinity_select_regression') 
+ names(salinity_select_regression)<-mm
+  salinity <- rowMeans(raster::extract(salinity_select_regression, coordinate[,1:2]))
+ 
+ dir("oxygen_sensor_select_regression",full.names = T) %>% stack() -> oxygen_sensor_select_regression 
+  mm<-list.files('oxygen_sensor_select_regression')
+ names(oxygen_sensor_select_regression)<-mm
+  oxygen_sensor <- rowMeans(raster::extract(oxygen_sensor_select_regression, coordinate[,1:2]))
+ 
+ 
+ dir("temperature_select_regression",full.names = T) %>% stack() -> temperature_select_regression 
+  mm<-list.files('temperature_select_regression') 
+ names(temperature_select_regression)<-mm
+  temperature <- rowMeans(raster::extract(temperature_select_regression, coordinate[,1:2]))
+ 
+  dir("O2sat_select_regression",full.names = T) %>% stack() -> O2sat_select_regression 
+  mm<-list.files('O2sat_select_regression') 
+ names(O2sat_select_regression)<-mm
+  O2sat <- rowMeans(raster::extract(O2sat_select_regression, coordinate[,1:2]))
+ 
+  dir("AOU_select_regression",full.names = T) %>% stack() -> AOU_select_regression 
+  mm<-list.files('AOU_select_regression') 
+ names(AOU_select_regression)<-mm
+  AOU <- rowMeans(raster::extract(AOU_select_regression, coordinate[,1:2]))
+  
+ dir("silicate_select_regression",full.names = T) %>% stack() -> silicate_select_regression 
+  mm<-list.files('silicate_select_regression') 
+ names(silicate_select_regression)<-mm
+  silicate <- rowMeans(raster::extract(silicate_select_regression, coordinate[,1:2]))
+
+  calcite <- raster::extract(raster('./Present.Surface.Calcite.Mean.BOv2_2.tif'), coordinate[,1:2]) 
+  chlorophyll <- raster::extract(raster('./Present.Surface.Chlorophyll.Mean.tif'), coordinate[,1:2]) 
+  iron<- raster::extract(raster('./Present.Surface.Iron.Mean.tif'), coordinate[,1:2]) 
+  Par<- raster::extract(raster('./Present.Surface.Par.Mean.BOv2_2.tif'), coordinate[,1:2]) 
+  pH<- raster::extract(raster('./Present.Surface.pH.BOv2_2.tif'), coordinate[,1:2]) 
+  phytoplankton<- raster::extract(raster('./Present.Surface.Phytoplankton.Mean.tif'), coordinate[,1:2]) 
+  
+ 
+ coordinate$ABS_latit <- abs(coordinate$latitude)
+   coordinate2 <-coordinate%>%cbind(AOU,oxygen_sensor,calcite,temperature,silicate, phytoplankton,salinity,chlorophyll,O2sat,Par,pH,iron) 
+   
+  coordinate2 <-na.omit(coordinate2)
+  
+  xb <- read.csv("marine_top_100m_layer.csv",row.names=1, header = TRUE, stringsAsFactors = FALSE)
+  cols_remain3<- c("log2sum_RPKM","ABS_latit","AOU","oxygen_sensor","Present.Surface.Calcite.Mean.BOv2_2","temperature","silicate","Present.Surface.Phytoplankton.Mean","salinity","Present.Surface.Chlorophyll.Mean","O2sat","Present.Surface.Par.Mean.BOv2_2","Present.Surface.pH.BOv2_2","Present.Surface.Iron.Mean") 
+
+ xcNA <- xb[ ,colnames(xb) %in% cols_remain3]
+   xcNA<- na.omit(xcNA)  
+colnames(xcNA)<-c("ABS_latit","log2sum_RPKM","salinity","oxygen_sensor","temperature","O2sat","AOU","silicate","calcite","chlorophyll","iron","Par","pH","phytoplankton") 
+ 
+ forest.marine <- randomForest(log2sum_RPKM~ABS_latit+AOU+oxygen_sensor+calcite+temperature+silicate+ phytoplankton+salinity+chlorophyll+O2sat+Par+pH+iron,data=xcNA,mtry=12,ntree=1300,importance=TRUE) 
+  
+  prediction <- predict(forest.marine, newdata = coordinate2, predict.all=TRUE) 
+   variance <- apply(prediction$individual, 1, var) 
+     final_prediction <- prediction$aggregate
+
+   final_prediction <-as.data.frame(final_prediction)
+   variance <-as.data.frame(variance)
+ prediction3<- cbind(coordinate2[,1:2],final_prediction,variance)
+  head(prediction3)
+      pdf('marine.pdf')
+ library("rnaturalearth")
+ library("rnaturalearthdata")
+ world <- ne_coastline(scale = "medium", returnclass = "sp")
+
+ ggplot()+geom_tile(data=prediction3,aes(x = longitude,y = latitude, fill = final_prediction))+geom_polygon(data = world, aes(x = long, y = lat, group=group),fill=NA,color="gray50")+coord_equal()+scale_fill_gradientn(colours=rev(c("#9E0142", "#D53E4F", "#F46D43" ,"#FDAE61" ,"#FEE08B","#FFFFBF" ,"#E6F598", "#ABDDA4" ,"#66C2A5", "#3288BD","#5E4FA2")),values=scales::rescale(c(0,0.5,0.65,0.75,0.85,1)))+theme_minimal()+theme(axis.title= element_blank()) 
+dev.off()
+
+ pdf('marine_regression_RF_variance2.pdf')
+ ggplot()+geom_tile(data=prediction3,aes(x = longitude,y = latitude, fill = variance))+geom_polygon(data = world, aes(x = long, y = lat, group=group),fill=NA,color="gray50")+coord_equal()+scale_fill_gradientn(colours=rev(c("#9E0142", "#D53E4F", "#F46D43" ,"#FDAE61" ,"#FEE08B","#FFFFBF" ,"#E6F598", "#ABDDA4" ,"#66C2A5", "#3288BD","#5E4FA2")),values=scales::rescale(c(0,0.5,0.65,0.75,0.85,1)))+theme_minimal()+theme(axis.title= element_blank()) 
+dev.off()
+
+ df2 <- prediction3 %>%group_by(latitude) %>%summarise(var1.pred.mean = mean(final_prediction),var1.pred.sd =  sd(final_prediction))
+
+ pdf('marine_regression_RF_additional.pdf')
+ ggplot(df2 , aes(var1.pred.mean , latitude))+geom_ribbon(aes(xmin = var1.pred.mean- var1.pred.sd,xmax = var1.pred.mean+var1.pred.sd ), alpha = 0.2)+geom_line( orientation = "y",size =1)+theme_minimal()+scale_y_continuous(limits = c(-90, 90))
+dev.off()
+
+ 8.#figure 4b&4d
+  library(RColorBrewer)
+ library(ggpubr)
+ xa<-read.csv('top6_phyla_without_outliers.csv',header=T,row.name=1)##outliers has been removed
+
+p1<- ggpie(xa[1:8,], x = "value", label = "phylum1",lab.pos = "in", lab.font = list(color = "black",size=5),fill = "phylum1", color = "white",palette = rev(brewer.pal(8,'RdPu')))+labs(title='soil')+guides(fill='none')
+p2<- ggpie(xa[9:16,], x = "value", label = "phylum1",lab.pos = "in", lab.font = list(color = "black",size=5),fill = "phylum1", color = "white",palette = rev(brewer.pal(8,'Blues')))+labs(title='marine')+guides(fill='none')
+ ggarrange(p1,p2,ncol=2) 
+
+ 8.#figure 5
+ library(ggthemes)
+library(ggpubr)
+ library(rstatix)  
+setwd("D:/Desktop/")
+#soil
+ wilcox_data<-read.csv('soil_Volcano.csv',header=T,row.names=1)
+   
+  wilcox_data$group="not-sig"  
+  wilcox_data$group[which((wilcox_data$fdr< 0.05)&(wilcox_data$FC_log2_100 > 1))]="up"
+  wilcox_data$group[which((wilcox_data$fdr<0.05)&(wilcox_data$FC_log2_100< -1))]="down"
+  
+   wilcox_data$label=""
+ 
+ wilcox_data<- wilcox_data[order(wilcox_data$FC_log2_100),] 
+  up_genes<- tail(wilcox_data$Genesymbol[which(wilcox_data$group=="up")],40) 
+  down_genes<- tail(wilcox_data$Genesymbol[which(wilcox_data$group=="down")],10)  
+  top_gene<- c(as.character(up_genes),as.character(down_genes))  
+  wilcox_data$label[match(top_gene,wilcox_data$Genesymbol)]<- top_gene  
+
+  ggscatter(wilcox_data,x="FC_log2_100",y="logP",color="group",palette=c("#2f5688","#BBBBBB","#CC0000"),size=3,font.label = 8,label =  wilcox_data$label,repel=T,xlab= "Log2FoldChange",ylab= "-Log10(Adjust P -value)")+theme_base()+ geom_hline(yintercept=1.3,linetype="dashed")+ geom_vline(xintercept=c(-0.8,1),linetype="dashed")
+ 
+ #marine
+ wilcox_data<-read.csv('marine_Volcano.csv',header=T,row.names=1)
+   
+  wilcox_data$group="not-sig"  
+  wilcox_data$group[which((wilcox_data$fdr< 0.05)&(wilcox_data$FC_log2_100 > 1))]="up"
+  wilcox_data$group[which((wilcox_data$fdr<0.05)&(wilcox_data$FC_log2_100< -1))]="down"
+  
+   wilcox_data$label=""
+ 
+ wilcox_data<- wilcox_data[order(wilcox_data$FC_log2_100),] 
+  up_genes<- tail(wilcox_data$Genesymbol[which(wilcox_data$group=="up")],40) 
+  down_genes<- tail(wilcox_data$Genesymbol[which(wilcox_data$group=="down")],10)  
+  top_gene<- c(as.character(up_genes),as.character(down_genes))  
+  wilcox_data$label[match(top_gene,wilcox_data$Genesymbol)]<- top_gene  
+
+  ggscatter(wilcox_data,x="FC_log2_100",y="logP",color="group",palette=c("#2f5688","#BBBBBB","#CC0000"),size=3,font.label = 8,label =  wilcox_data$label,repel=T,xlab= "Log2FoldChange",ylab= "-Log10(Adjust P -value)")+theme_base()+ geom_hline(yintercept=1.3,linetype="dashed")+ geom_vline(xintercept=c(-0.8,1),linetype="dashed")
+ 
+ 9.Figure 6
+ 9.1#Figure 6a&b
+   library(dplyr)
+
+   xc<-read.csv('soil_div.csv',header=T,row.names=1)
+   xb<-read.csv('RPKM_soil.csv',header=T,row.names=1)
+   soil <- cbind(xb,xc)
+   yc<-read.csv('marine_div.csv',header=T,row.names=1)
+   yb<-read.csv('RPKM_marine.csv',header=T,row.names=1)
+   marine <- cbind(yb,yc)
+   
+  cor.test(xabc_soil[,2],xabc_soil$shannon,method = "spearman")
+  cor.test(xabc_marine[,2],xabc_marine$shannon,method = "spearman")
+
+  ddd<-rbind(soil,marine)
+  soil$source="soil"
+  marine$source="marine"
+  ddd<-rbind(soil,marine)
+  ggplot(ddd, aes(x = log2sum.RPKM, y = shannon))+geom_smooth(aes(color = source), method = "lm",se = T, fullrange = F)+ ggpubr::stat_cor(aes(color = source), label.x = 3)+scale_color_manual(values =c( "#3154aa","#ac5e74")) 
+  
+  ggplot(ddd, aes(x = log2sum.RPKM, y = richness))+geom_smooth(aes(color = source), method = "lm",se = T, fullrange = F)+ ggpubr::stat_cor(aes(color = source), label.x = 3)+scale_color_manual(values =c( "#3154aa","#ac5e74")) 
+
+  9.2#Figure 6c&d
+ library(dplyr)
+ library(vegan)
+
+ setwd("D:/Desktop/")
+ #marine
+  xa<-read.csv('species_marine.csv',header=T,row.names=1)
+ xb<-read.csv('RPKM_marine.csv',header=T,row.names=1)
+ xabc <-cbind(xb,xa)
+    
+  spi2_marine <-vegdist(xabc[,-c(1:2)],'euclidean')
+  mantel(spi2_marine,dist(xabc[,2],"euclid"),permutations = 999)
+  mantel(spi2_marine,dist(xabc[,2],"bray"),permutations = 999)
+
+  marine_bray<-as.data.frame(cbind(dist(xabc[,2],"bray"),spi2_marine))
+ marine_euclid<-as.data.frame(cbind(dist(xabc[,2],"euclid"),spi2_marine))
+
+ #soil
+  
+   ya<-read.csv('species_soil.csv',header=T,row.names=1)
+ yb<-read.csv('RPKM_soil.csv',header=T,row.names=1)
+ yabc <-cbind(yb,ya)
+   
+   spi2_soil <-vegdist(yabc[,-c(1:2)],'euclidean')
+  mantel(spi2_soil,dist(yabc[,2],"euclid"),permutations = 999)
+  mantel(spi2_soil,dist(yabc[,2],"bray"),permutations = 999)
+
+  soil_bray<-as.data.frame(cbind(dist(yabc[,2],"bray"),spi2_soil))
+ soil_euclid<-as.data.frame(cbind(dist(yabc[,2],"euclid"),spi2_soil))
+
+   
+ allbray <- merge(marine_bray, soil_bray)
+  alleuc <- merge(marine_euclid, soil_euclid)
+
+ ggplot(alleuc , aes(x = V1, y = spi2))+geom_smooth(aes(color = source), method = "lm",se = T, fullrange = F)+ ggpubr::stat_cor(aes(color = source), label.x = 3)+scale_color_manual(values =c( "#3154aa","#ac5e74")) 
+  ggplot(allbray , aes(x = V1, y = spi2))+geom_smooth(aes(color = source), method = "lm",se = T, fullrange = F)+ ggpubr::stat_cor(aes(color = source), label.x = 3)+scale_color_manual(values =c( "#3154aa","#ac5e74")) 
+
+ 10.#Figure 7
+  library(dplyr)
+library(tidyr)
+library(ggplot2)
+ setwd("D:/Desktop/")
+
+#marine
+
+  cor_data_df<-read.csv("figure 7a.csv",header=T,row.names=1)
+ 
+ ccc<- cor_data_df %>% arrange(desc(sum))%>% dplyr::slice(1:50)%>%filter(fdr < 0.01)
+ 
+ ggplot(data=ccc, aes(x=reorder(symbol,correlation), y=abs(correlation))) +geom_bar(aes(fill = ifelse(correlation >= 0, "Positive", "Negative")),stat="identity")+ coord_flip()+ theme_bw() +theme(text=element_text(size = 8))
+
+ #soil
+  cor_data_df<-read.csv("figure 7b.csv",header=T,row.names=1)
+ 
+ ccc<- cor_data_df %>% arrange(desc(sum))%>% dplyr::slice(1:50)%>%filter(fdr < 0.01)
+ 
+ ggplot(data=ccc, aes(x=reorder(symbol,correlation), y=abs(correlation))) +geom_bar(aes(fill = ifelse(correlation >= 0, "Positive", "Negative")),stat="identity")+ coord_flip()+ theme_bw() +theme(text=element_text(size = 8))
+
+ #NPS-cycling pathways
+ cor_data_df<-read.csv("figure 7c.csv",header=T,row.names=1)
+ ggplot(data=cor_data_df, aes(x=symbol, y=correlation)) +geom_bar(aes(fill = source),stat="identity",position = position_dodge(0.8),width = 0.7)+theme(axis.text.x = element_text(angle = -90,vjust = 0.4, hjust=0.1)) 
+ 
+ 11.#Figure S7
+  setwd("D:/Desktop/")
+ xd<-read.csv('Figure S7.csv',header=T,row.names=NULL)
+#1
+ library(dplyr)
+library(ggplot2)
+
+xd$color <- as.factor(xd$color)
+df1=xd
+df1%>%
+   mutate(group_1 = case_when(
+       number <= 0 ~ "A",
+       TRUE ~ "B"
+   ))%>%
+   mutate(group_2=case_when(
+       number >= 0 & number < 0.1 ~ "[0,0.1)",
+       number >= 0.1 & number < 0.2 ~ "[0.1,0.2)",
+       number >= 0.2 & number < 0.3 ~ "[0.2,0.3)",
+       number >= 0.3 & number <= 0.4 ~ "[0.3,0.4]",
+       number > 0.4 & number <= 0.6 ~ "(0.4,0.6)",
+       number > 0.6 & number <= 0.8 ~ "(0.6,0.8]",
+       number > 0.8 & number <= 0.9 ~ "(0.8,0.9]",
+       number > 0.9 & number <= 1 ~ "(0.9,1]",
+   ))%>%
+   mutate(number_1=case_when(
+       number >= 0 & number < 0.1 ~ 0.05,
+       number >= 0.1 & number < 0.2 ~ 0.15,
+       number >= 0.2 & number < 0.3 ~ 0.25,
+       number >= 0.3 & number <= 0.4 ~ 0.35,
+       number > 0.6 & number <= 0.8 ~ 0.7,
+       number > 0.8 & number <= 0.9 ~ 0.85,
+       number > 0.9 & number <= 1 ~ 0.95,
+   )) -> df2
+df3<-data.frame(
+    x = seq(1.5,38.5,1),
+    xend = seq(1.5,38.5,1),
+    y = -Inf,
+    yend = Inf
+)
+df3
+df4<-data.frame(
+    x = -Inf,
+    xend = Inf,
+    y = seq(1.5,11.5,1),
+    yend = seq(1.5,11.5,1)
+)
+
+ggplot(data=df2,aes(x=group,y=phylum))+geom_point(aes(size=number,color=factor(color2)),shape=15)+theme_bw()+theme(text = element_text(colour = "black", size = 16),panel.grid = element_blank(),panel.border = element_rect(color="grey"),axis.text.x = element_text(angle = 45,vjust = 0.8))+geom_segment(data=df3,aes(x=x,xend=xend,y=y,yend=yend),color="grey")+geom_segment(data=df4,aes(x=x,xend=xend,y=y,yend=yend),color="grey")+labs(x=NULL,y=NULL)+facet_wrap(~frac,scales="free_y",ncol=1)
+ 
+ #2.
+   library("ggplot2")
+  library("ggpubr")
+   xa<-read.csv("Figure S7_2.csv",header=T,row.names=NULL)
+   ggbarplot(xa, x = "group2", y = "RPKM", add = c("mean_se"),color = "source",position = position_dodge(0.6),size=0.5)+theme(axis.text.x = element_text(angle = -25,vjust = 0.4, hjust=0.1)) 
+ 
+
+ 
+ 
+ 
+ 
