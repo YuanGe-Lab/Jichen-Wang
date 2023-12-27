@@ -33,12 +33,12 @@ xa<-read.csv('figure1.csv')
   ggplot(xa,aes(source,coverage),size=2)+geom_violin(aes(color=source)) + geom_boxplot(aes(color=source),width = 0.05)+ theme( text=element_text(size = 16,color="black"))
 
  
- 3##Figure 1d
+ 3##Figure 1d## 'species_total.csv' is bigger than 25M, which is not available online.
 library('vegan')
  library(ggplot2)
  library(ggpubr)
 
- xx<-read.csv('species_total.csv',header=T,row.names = 1)
+ xx<-read.csv('species_total.csv',header=T,row.names = 1) ##file is bigger than 25M, which is not available online.
  x1<-xx[,1]
  x2<-xx[,-1] 
  sp<-metaMDS(x2,distance='bray',k=2)
